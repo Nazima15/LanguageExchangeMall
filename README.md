@@ -56,42 +56,6 @@ LanguageExchangeMall은 **JSP + Servlet + JDBC** 기반으로 구현한
 
 ---
 
-## 📁 프로젝트 구조
-
-
-src/main/java
-├── controller
-│ ├── MainServlet.java
-│ ├── NoticeListServlet.java
-│ ├── NoticeDetailServlet.java
-│ ├── WishlistListServlet.java
-│ ├── WishlistDeleteServlet.java
-│ └── MyPageServlet.java
-├── dao
-│ ├── NoticeDAO.java
-│ ├── PartnerDAO.java
-│ └── WishlistDAO.java
-└── dto
-├── Notice.java
-├── Partner.java
-└── Wishlist.java
-
-src/main/webapp
-├── WEB-INF/views
-│ ├── main.jsp
-│ ├── login.jsp
-│ ├── signup.jsp
-│ ├── mypage.jsp
-│ ├── partners.jsp
-│ ├── wishlist/list.jsp
-│ └── notice
-│ ├── list.jsp
-│ └── detail.jsp
-├── images
-└── index.jsp
-
----
-
 ## 🛠 구현한 핵심 기술
 
 ### ✔ MVC 패턴
