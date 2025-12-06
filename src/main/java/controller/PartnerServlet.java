@@ -1,63 +1,64 @@
 package controller;
 
-import dto.User;
-import dao.UserDAO;
+import dao.PartnerDAO;
+import dto.Partner;
 
-import javax.servlet.*;
-import javax.servlet.http.*;
+import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.*;
+import javax.servlet.RequestDispatcher;
 import java.io.IOException;
 import java.util.List;
-import java.util.stream.Collectors;
 
-@WebServlet("/PartnerServlet")
+@WebServlet("/partners") 
 public class PartnerServlet extends HttpServlet {
-    private static final long serialVersionUID = 1L;
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    private PartnerDAO partnerDAO = new PartnerDAO(); // DB에서 파트너 정보 가져오는 DAO
 
-        try {
-            HttpSession session = request.getSession();
-            User loginUser = (User) session.getAttribute("user");
-            UserDAO userDAO = new UserDAO();
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
 
-            // 모든 사용자 목록 가져오기
-            List<User> partnerList = userDAO.getAllPartners();
+        // 🔍 검색어 받기 (없으면 빈 문자열)
+        String keyword = request.getParameter("keyword");
+        if (keyword == null) keyword = "";
 
-            // 로그인한 사용자 본인 제외
-            if (loginUser != null) {
-                partnerList.removeIf(u -> u.getUserId() == loginUser.getUserId());
-            }
-
-            // 필터 (언어)
-            String nativeLang = request.getParameter("native_lang");
-            String learnLang = request.getParameter("learn_lang");
-
-            if ((nativeLang != null && !nativeLang.isEmpty()) ||
-                (learnLang != null && !learnLang.isEmpty())) {
-
-                partnerList = partnerList.stream()
-                        .filter(u -> nativeLang == null || nativeLang.isEmpty() ||
-                                (u.getNativeLang() != null && u.getNativeLang().equals(nativeLang)))
-                        .filter(u -> learnLang == null || learnLang.isEmpty() ||
-                                (u.getLearnLang() != null && u.getLearnLang().equals(learnLang)))
-                        .collect(Collectors.toList());
-            }
-
-            // JSP 전달 데이터 설정
-            request.setAttribute("partnerList", partnerList);
-            request.setAttribute("selectedNative", nativeLang);
-            request.setAttribute("selectedLearn", learnLang);
-
-            // 페이지 이동
-            RequestDispatcher dispatcher = request.getRequestDispatcher("/partners.jsp");
-            dispatcher.forward(request, response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            response.getWriter().println("파트너 목록 불러오기 오류: " + e.getMessage());
+        // 📄 현재 페이지 번호 받기 (기본 1페이지)
+        int page = 1;
+        if (request.getParameter("page") != null) {
+            page = Integer.parseInt(request.getParameter("page"));
         }
+
+        int pageSize = 8; // 한 페이지에 8명씩 보기
+        int offset = (page - 1) * pageSize; // DB에서 가져올 시작 위치
+
+        // 📌 DB에서 파트너 목록 가져오기 (검색 + 페이징 적용)
+        List<Partner> partners = partnerDAO.getPartners(keyword, offset, pageSize);
+
+        // 📌 전체 데이터 개수 → 총 페이지 수 계산
+        int totalCount = partnerDAO.getPartnersCount(keyword);
+        int totalPage = (int) Math.ceil((double) totalCount / pageSize);
+
+        // ❤️ 찜 성공/실패 메시지 (1회성) — 세션에서 가져와서 request로 이동
+        HttpSession session = request.getSession();
+        Integer successId = (Integer) session.getAttribute("wishlistSuccessId");  // 찜 성공한 사용자 ID
+        Integer errorId = (Integer) session.getAttribute("wishlistErrorPartnerId"); // 이미 찜함 or 실패
+
+        request.setAttribute("wishlistSuccessId", successId); // JSP에서 메시지 표시 가능
+        request.setAttribute("wishlistErrorPartnerId", errorId);
+
+        session.removeAttribute("wishlistSuccessId"); // ⭐ 1번만 출력되도록 세션에서 삭제
+        session.removeAttribute("wishlistErrorPartnerId");
+
+        // 📌 JSP에서 사용할 데이터 넣기
+        request.setAttribute("partners", partners);
+        request.setAttribute("keyword", keyword);
+        request.setAttribute("page", page);
+        request.setAttribute("totalPage", totalPage);
+
+        // 📄 partners.jsp 로 화면 출력 (서버 내부 이동)
+        RequestDispatcher rd = request.getRequestDispatcher("/WEB-INF/views/partners.jsp");
+        rd.forward(request, response);
     }
 }
-
 

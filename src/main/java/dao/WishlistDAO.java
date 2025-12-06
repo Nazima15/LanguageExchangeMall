@@ -1,118 +1,121 @@
 package dao;
 
+import dto.Wishlist;
 import util.DBUtil;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import dto.User;
 
 public class WishlistDAO {
 
-    // ⭐ 이미 관심 목록에 있는지 확인하는 메서드
-    public boolean exists(int userId, int partnerId) {
-        String sql = "SELECT COUNT(*) FROM wishlist WHERE user_id = ? AND partner_id = ?";
+    /**
+     * 관심(위시리스트) 추가
+     */
+    public boolean addWishlist(int userId, int partnerId) {
+        String sql = "INSERT INTO wishlist (user_id, partner_id) VALUES (?, ?)";
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, userId);
-            stmt.setInt(2, partnerId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next() && rs.getInt(1) > 0) {
-                return true;
-            }
+            ps.setInt(1, userId);
+            ps.setInt(2, partnerId);
+            return ps.executeUpdate() > 0;
 
-        } catch (Exception e) {
+        } catch (Exception e) {   
             e.printStackTrace();
         }
         return false;
     }
 
-    // ⭐ 관심 목록 저장 (중복 방지 적용됨)
-    public void addWishlist(int userId, int partnerId) {
-        if (exists(userId, partnerId)) return;
-
-        String sql = "INSERT INTO wishlist (user_id, partner_id) VALUES (?, ?)";
-
+    /**
+     * 동일 userId + partnerId가 이미 존재하는지 체크
+     */
+    public boolean exists(int userId, int partnerId) {
+        String sql = "SELECT 1 FROM wishlist WHERE user_id = ? AND partner_id = ? LIMIT 1";
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, userId);
-            stmt.setInt(2, partnerId);
-            stmt.executeUpdate();
+            ps.setInt(1, userId);
+            ps.setInt(2, partnerId);
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // ⭐ 관심 목록 삭제
-    public boolean removeWishlist(int userId, int partnerId) {
-        String sql = "DELETE FROM wishlist WHERE user_id = ? AND partner_id = ?";
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, userId);
-            stmt.setInt(2, partnerId);
-            int rows = stmt.executeUpdate();
-            return rows > 0; // 삭제 성공 시 true 반환
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    // ⭐ 관심 목록 전체 파트너 정보 가져오기 (wishlist.jsp 등에서 사용)
-    public List<User> getWishlist(int userId) {
-        List<User> list = new ArrayList<>();
-
-        String sql =
-                "SELECT u.user_id, u.nickname, u.native_lang_id, u.learn_lang_id " +
-                "FROM wishlist w " +
-                "JOIN users u ON w.partner_id = u.user_id " +
-                "WHERE w.user_id = ?";
-
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            while (rs.next()) {
-                User u = new User();
-                u.setUserId(rs.getInt("user_id"));
-                u.setNickname(rs.getString("nickname"));
-                u.setNativeLang(rs.getString("native_lang_id"));
-                u.setLearnLang(rs.getString("learn_lang_id"));
-                list.add(u);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
             }
 
-        } catch (Exception e) {
+        } catch (Exception e) {   // SQLException → Exception 변경
             e.printStackTrace();
         }
+        return false;
+    }
+
+    /**
+     * 관심 목록 조회 + partner JOIN
+     */
+    public List<Wishlist> getWishlistByUser(int userId) {
+        List<Wishlist> list = new ArrayList<>();
+
+        String sql =
+            "SELECT " +
+            "   w.id AS wishlistId, " +
+            "   w.user_id, " +
+            "   w.partner_id, " +
+            "   w.created_at, " +
+            "   p.image_url, " +
+            "   p.name AS name, " +
+            "   p.native_lang, " +
+            "   p.learn_lang, " +
+            "   p.intro " +
+            "FROM wishlist w " +
+            "JOIN partners p ON w.partner_id = p.id " +   // partners 테이블
+            "WHERE w.user_id = ? " +
+            "ORDER BY w.created_at DESC";
+
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Wishlist w = new Wishlist();
+
+                    w.setWishlistId(rs.getInt("wishlistId"));
+                    w.setUserId(rs.getInt("user_id"));
+                    w.setPartnerId(rs.getInt("partner_id"));
+                    w.setCreatedAt(rs.getString("created_at"));
+
+                    w.setImageUrl(rs.getString("image_url"));
+                    w.setName(rs.getString("name"));
+                    w.setNativeLang(rs.getString("native_lang"));
+                    w.setLearnLang(rs.getString("learn_lang"));
+                    w.setIntro(rs.getString("intro"));
+
+                    list.add(w);
+                }
+            }
+
+        } catch (Exception e) {   // SQLException → Exception 변경
+            e.printStackTrace();
+        }
+
         return list;
     }
 
-    // ⭐ JSP에서 “이미 담긴 partnerId 목록” 확인할 때 사용
-    public List<Integer> getWishlistIds(int userId) {
-        List<Integer> ids = new ArrayList<>();
-
-        String sql = "SELECT partner_id FROM wishlist WHERE user_id = ?";
-
+    /**
+     * 관심 항목 삭제
+     */
+    public boolean deleteWishlist(int wishlistId) {
+        String sql = "DELETE FROM wishlist WHERE id = ?";
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
+            ps.setInt(1, wishlistId);
+            return ps.executeUpdate() > 0;
 
-            while (rs.next()) {
-                ids.add(rs.getInt("partner_id"));
-            }
-
-        } catch (Exception e) {
+        } catch (Exception e) {   // SQLException → Exception 변경
             e.printStackTrace();
         }
-        return ids;
+        return false;
     }
 }
 

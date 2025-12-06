@@ -45,6 +45,13 @@
       <artifactId>mariadb-java-client</artifactId>
       <version>3.3.0</version>
     </dependency>
+    <!-- MariaDB는 그대로 두고 H2 추가 -->
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <version>2.2.220</version>
+</dependency>
+
   </dependencies>
 
   <build>
